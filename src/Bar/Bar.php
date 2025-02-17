@@ -28,15 +28,26 @@ class Bar implements BarContract
         $width = min($this->width ?? $maxBarWidth, $maxBarWidth);
         $y = $chart->yForAxis($this->value, $this->yAxis);
 
-        if (! is_null($this->width)) {
+        if (!is_null($this->width)) {
             $x += ($maxBarWidth - $width) / 2;
         }
 
-        if ($this->labelRotation) {
-            $labelX = $x - ($width / 2);
-        } else {
-            $labelX = $x + $width / 2;
-        }
+        // **Determine label position**
+        $labelX = $this->labelRotation ? $x - ($width / 2) : $x + $width / 2;
+
+        // **Available Space**
+        $maxLabelWidth = $this->labelRotation ? $chart->availableHeight() : ($maxBarWidth * 1.5);
+        $maxLabelHeight = $chart->bottomSpace(); // Space below bars for labels
+
+        // **Shorten Label Only When Necessary**
+        $shortenedName = $this->shortenLabel(
+            $this->name ?? '',
+            $this->fontSize ?? $chart->fontSize,
+            $maxLabelWidth,
+            $maxLabelHeight,
+            $this->labelRotation,
+            $labelX // Pass label position to prevent negative x
+        );
 
         return new Fragment([
             new Rect(
@@ -50,7 +61,7 @@ class Bar implements BarContract
                 title: $this->value,
             ),
             $this->name ? new Text(
-                content: $this->name,
+                content: $shortenedName,
                 x: $labelX,
                 y: $chart->bottom() + $this->labelMarginY,
                 fontFamily: $this->fontFamily ?? $chart->fontFamily,
@@ -60,6 +71,78 @@ class Bar implements BarContract
                 transform: $this->labelRotation ? "rotate({$this->labelRotation} {$labelX} {$chart->bottom()})" : null,
             ) : null,
         ]);
+    }
+
+    /**
+     * Shortens a label incrementally if it exceeds the available space in both X and Y dimensions.
+     *
+     * @param string $text The original text
+     * @param int $fontSize The font size
+     * @param float $maxWidth The maximum width allowed
+     * @param float $maxHeight The maximum height allowed
+     * @param ?int $rotation Rotation angle in degrees
+     * @param float $labelX The label's current x-position
+     * @return string The shortened text with ellipsis if needed
+     */
+    private function shortenLabel(string $text, int $fontSize, float $maxWidth, float $maxHeight, ?int $rotation, float $labelX): string
+    {
+        if ($text === '') {
+            return '';
+        }
+
+        $ellipsis = '...';
+        $minChars = 3; // Ensure we always keep at least a few characters
+
+        // Approximate character width per font size
+        $avgCharWidth = $fontSize * 0.6;
+        $textWidth = strlen($text) * $avgCharWidth;
+        $textHeight = $fontSize;
+
+        // Convert rotation to radians
+        $angle = deg2rad($rotation ?? 0);
+
+        // Compute rotated bounding box dimensions
+        $rotatedWidth = abs($textWidth * cos($angle)) + abs($textHeight * sin($angle));
+        $rotatedHeight = abs($textWidth * sin($angle)) + abs($textHeight * cos($angle));
+
+        // **Check if it fits immediately in both dimensions**
+        if (
+            $rotatedWidth <= $maxWidth &&
+            $rotatedHeight <= $maxHeight &&
+            $labelX - ($rotatedWidth / 2) >= 0
+        ) {
+            return $text; // No truncation needed
+        }
+
+        // **Ensure label stays within the chart**
+        $availableWidth = min($maxWidth, $labelX * 2); // Prevent negative x overflow
+        $maxEllipsisWidth = strlen($ellipsis) * $avgCharWidth;
+
+        // **Iteratively shorten text until it fits both X & Y constraints**
+        while (strlen($text) > $minChars) {
+            $shortenedText = substr($text, 0, -1); // Remove last character
+            $shortenedWidth = strlen($shortenedText) * $avgCharWidth;
+            $ellipsizedWidth = ($shortenedWidth + $maxEllipsisWidth);
+
+            $rotatedShortenedWidth = abs($shortenedWidth * cos($angle)) + abs($textHeight * sin($angle));
+            $rotatedEllipsizedWidth = abs($ellipsizedWidth * cos($angle)) + abs($textHeight * sin($angle));
+
+            $rotatedShortenedHeight = abs($shortenedWidth * sin($angle)) + abs($textHeight * cos($angle));
+            $rotatedEllipsizedHeight = abs($ellipsizedWidth * sin($angle)) + abs($textHeight * cos($angle));
+
+            // **If it fits within both X & Y space, return it**
+            if (
+                $rotatedEllipsizedWidth <= $availableWidth &&
+                $rotatedEllipsizedHeight <= $maxHeight
+            ) {
+                return $shortenedText . $ellipsis; // Once it fits, return it with "..."
+            }
+
+            // Continue shortening
+            $text = $shortenedText;
+        }
+
+        return substr($text, 0, $minChars) . $ellipsis; // Ensure we always return a meaningful value
     }
 
     public function value(): float
