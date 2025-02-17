@@ -18,7 +18,8 @@ class Text implements Stringable
         protected string $textAnchor = 'start',
         protected string $dominantBaseline = 'alphabetic',
         protected string $alignmentBaseline = 'auto',
-        protected ?string $transform = null
+        protected ?string $transform = null,
+        protected ?int $rotate = null,
     ) {
         //
     }
@@ -38,6 +39,10 @@ class Text implements Stringable
             htmlspecialchars($this->dominantBaseline, ENT_QUOTES),
             htmlspecialchars($this->alignmentBaseline, ENT_QUOTES),
         );
+
+        if ($this->rotate !== null) {
+            $this->transform = sprintf('rotate(%s)', $this->rotate);
+        }
 
         if ($this->transform) {
             $attributes .= sprintf(' transform="%s"', htmlspecialchars($this->transform, ENT_QUOTES));

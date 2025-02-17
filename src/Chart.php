@@ -237,6 +237,11 @@ class Chart
         return $this->width - $this->rightMargin;
     }
 
+    public function bottomSpace(): float
+    {
+        return $this->bottomMargin;
+    }
+
     public function incrementLeftMargin(float $value): void
     {
         $this->leftMargin += $value;

@@ -13,6 +13,7 @@ class Bars extends Serie
     public function __construct(
         protected array $bars = [],
         public ?string $yAxis = null,
+        public ?int $spacing = null,
     ) {
         parent::__construct($yAxis);
     }
@@ -42,7 +43,11 @@ class Bars extends Serie
         $maxBarWidth = 0;
 
         if ($numBars > 0) {
-            $maxBarWidth = $chart->availableWidth() / $numBars;
+            if ($this->spacing) {
+                $maxBarWidth = ($chart->availableWidth() - ($this->spacing * ($numBars - 1))) / $numBars;
+            } else {
+                $maxBarWidth = $chart->availableWidth() / $numBars;
+            }
         }
 
         $x = $chart->left();
@@ -52,7 +57,7 @@ class Bars extends Serie
         foreach ($this->bars as $bar) {
             $svg .= $bar->render($chart, $x, $maxBarWidth);
 
-            $x += $maxBarWidth;
+            $x += $maxBarWidth + ($this->spacing ?? 0);
         }
 
         return $svg;
