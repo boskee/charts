@@ -35,19 +35,19 @@ class Bar implements BarContract
         // **Determine label position**
         $labelX = $this->labelRotation ? $x - ($width / 2) : $x + $width / 2;
 
-        // **Available Space**
-        $maxLabelWidth = $this->labelRotation ? $chart->availableHeight() : ($maxBarWidth * 1.5);
-        $maxLabelHeight = $chart->bottomSpace(); // Space below bars for labels
+        // **Shorten label only if a name is present**
+        $shortenedName = null;
+        if (!empty(trim($this->name))) {
+            $maxLabelWidth = $this->labelRotation ? $chart->availableHeight() : ($maxBarWidth * 1.5);
+            $maxLabelHeight = $chart->bottomSpace(); // Space below bars for labels
 
-        // **Shorten Label Only When Necessary**
-        $shortenedName = $this->shortenLabel(
-            $this->name ?? '',
-            $this->fontSize ?? $chart->fontSize,
-            $maxLabelWidth,
-            $maxLabelHeight,
-            $this->labelRotation,
-            $labelX // Pass label position to prevent negative x
-        );
+            $shortenedName = $this->shortenLabel(
+                $this->fontSize ?? $chart->fontSize,
+                $maxLabelWidth,
+                $maxLabelHeight,
+                $labelX // Pass label position to prevent negative x
+            );
+        }
 
         return new Fragment([
             new Rect(
@@ -60,7 +60,7 @@ class Bar implements BarContract
                 ry: $this->radius ?? 0,
                 title: $this->value,
             ),
-            $this->name ? new Text(
+            $shortenedName ? new Text(
                 content: $shortenedName,
                 x: $labelX,
                 y: $chart->bottom() + $this->labelMarginY,
@@ -74,24 +74,23 @@ class Bar implements BarContract
     }
 
     /**
-     * Shortens a label incrementally if it exceeds the available space in both X and Y dimensions.
+     * Shortens the label incrementally if it exceeds the available space in both X and Y dimensions.
      *
-     * @param string $text The original text
      * @param int $fontSize The font size
      * @param float $maxWidth The maximum width allowed
      * @param float $maxHeight The maximum height allowed
-     * @param ?int $rotation Rotation angle in degrees
      * @param float $labelX The label's current x-position
      * @return string The shortened text with ellipsis if needed
      */
-    private function shortenLabel(string $text, int $fontSize, float $maxWidth, float $maxHeight, ?int $rotation, float $labelX): string
+    private function shortenLabel(int $fontSize, float $maxWidth, float $maxHeight, float $labelX): string
     {
-        if ($text === '') {
+        if (empty(trim($this->name))) {
             return '';
         }
 
         $ellipsis = '...';
         $minChars = 3; // Ensure we always keep at least a few characters
+        $text = $this->name;
 
         // Approximate character width per font size
         $avgCharWidth = $fontSize * 0.6;
@@ -99,7 +98,7 @@ class Bar implements BarContract
         $textHeight = $fontSize;
 
         // Convert rotation to radians
-        $angle = deg2rad($rotation ?? 0);
+        $angle = deg2rad($this->labelRotation ?? 0);
 
         // Compute rotated bounding box dimensions
         $rotatedWidth = abs($textWidth * cos($angle)) + abs($textHeight * sin($angle));
@@ -114,7 +113,7 @@ class Bar implements BarContract
             return $text; // No truncation needed
         }
 
-        // **Ensure label stays within the chart**
+        // **Ensure label stays within the chart and does not overflow left**
         $availableWidth = min($maxWidth, $labelX * 2); // Prevent negative x overflow
         $maxEllipsisWidth = strlen($ellipsis) * $avgCharWidth;
 
@@ -122,12 +121,9 @@ class Bar implements BarContract
         while (strlen($text) > $minChars) {
             $shortenedText = substr($text, 0, -1); // Remove last character
             $shortenedWidth = strlen($shortenedText) * $avgCharWidth;
-            $ellipsizedWidth = ($shortenedWidth + $maxEllipsisWidth);
+            $ellipsizedWidth = $shortenedWidth + $maxEllipsisWidth;
 
-            $rotatedShortenedWidth = abs($shortenedWidth * cos($angle)) + abs($textHeight * sin($angle));
             $rotatedEllipsizedWidth = abs($ellipsizedWidth * cos($angle)) + abs($textHeight * sin($angle));
-
-            $rotatedShortenedHeight = abs($shortenedWidth * sin($angle)) + abs($textHeight * cos($angle));
             $rotatedEllipsizedHeight = abs($ellipsizedWidth * sin($angle)) + abs($textHeight * cos($angle));
 
             // **If it fits within both X & Y space, return it**
