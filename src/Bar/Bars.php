@@ -14,12 +14,17 @@ class Bars extends Serie
         protected array $bars = [],
         public ?string $yAxis = null,
         public ?int $spacing = null,
+        public ?int $maxValue = null,
     ) {
         parent::__construct($yAxis);
     }
 
     public function maxValue(): float
     {
+        if ($this->maxValue) {
+            return $this->maxValue;
+        }
+
         if (count($this->bars) === 0) {
             return 0;
         }

@@ -21,6 +21,9 @@ class Bar implements BarContract
         public int $labelMarginY = 30,
         public ?int $radius = null,
         public ?int $labelRotation = null,
+        public ?string $innerText = null,
+        public ?string $innerTextColor = null,
+        public ?int $innerTextFontSize = null,
     ) {}
 
     public function render(Chart $chart, float $x, float $maxBarWidth): string
@@ -32,8 +35,35 @@ class Bar implements BarContract
             $x += ($maxBarWidth - $width) / 2;
         }
 
-        // **Determine label position**
-        $labelX = $this->labelRotation ? $x - ($width / 2) : $x + $width / 2;
+        $fontSize = $this->fontSize ?? $chart->fontSize;
+        $avgCharWidth = $fontSize * 0.6; // Approximate character width
+
+        // **Shorten label if needed**
+        $shortenedName = null;
+        if (!empty(trim($this->name))) {
+            $maxLabelWidth = $this->labelRotation ? $chart->availableHeight() : ($maxBarWidth * 1.5);
+            $maxLabelHeight = $chart->bottomSpace();
+
+            $shortenedName = $this->shortenLabel(
+                $fontSize,
+                $maxLabelWidth,
+                $maxLabelHeight,
+                0
+            );
+        }
+
+        // **Calculate text width after shortening**
+        $textLength = mb_strlen($shortenedName ?? '');
+        $textWidth = $textLength * $avgCharWidth;
+
+        // **Ensure the last letter aligns with the center of the bar**
+        if ($this->labelRotation) {
+            // Adjust $labelX so the end of the text is in the middle of the bar
+            $labelX = $x + ($width / 2) - ($textWidth / 4);
+        } else {
+            // Normal center alignment
+            $labelX = $x + $width / 2;
+        }
 
         // **Shorten label only if a name is present**
         $shortenedName = null;
@@ -69,6 +99,15 @@ class Bar implements BarContract
                 fill: $this->labelColor ?? $chart->color,
                 textAnchor: $this->labelRotation ? 'end' : 'middle',
                 transform: $this->labelRotation ? "rotate({$this->labelRotation} {$labelX} {$chart->bottom()})" : null,
+            ) : null,
+            $this->innerText ? new Text(
+                content: $this->innerText,
+                x: $x + $width / 2,
+                y: $y + ($chart->bottom() - $y) / 2,
+                fontFamily: $this->fontFamily ?? $chart->fontFamily,
+                fontSize: $this->innerTextFontSize ?? $chart->fontSize,
+                fill: $this->innerTextColor ?? $chart->color,
+                textAnchor: 'middle',
             ) : null,
         ]);
     }
